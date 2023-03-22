@@ -9,11 +9,13 @@ from . import util
 from .model import bodypose_model
 
 class Body(object):
-    def __init__(self, model_path):
+    def __init__(self, model_path, torch_dtype=torch.float32, force_cpu=False):
+        self.torch_dtype = torch_dtype
+        self.force_cpu = force_cpu
         self.model = bodypose_model()
-        if torch.cuda.is_available():
+        if not force_cpu and torch.cuda.is_available():
             self.model = self.model.cuda()
-            print('cuda')
+            #print('cuda')
         model_dict = util.transfer(self.model, torch.load(model_path))
         self.model.load_state_dict(model_dict)
         self.model.eval()
@@ -37,14 +39,14 @@ class Body(object):
             im = np.transpose(np.float32(imageToTest_padded[:, :, :, np.newaxis]), (3, 2, 0, 1)) / 256 - 0.5
             im = np.ascontiguousarray(im)
 
-            data = torch.from_numpy(im).float()
+            data = torch.from_numpy(im).to(self.torch_dtype)
             if torch.cuda.is_available():
                 data = data.cuda()
             # data = data.permute([2, 0, 1]).unsqueeze(0).float()
             with torch.no_grad():
                 Mconv7_stage6_L1, Mconv7_stage6_L2 = self.model(data)
-            Mconv7_stage6_L1 = Mconv7_stage6_L1.cpu().numpy()
-            Mconv7_stage6_L2 = Mconv7_stage6_L2.cpu().numpy()
+            Mconv7_stage6_L1 = Mconv7_stage6_L1.cpu().numpy().astype(np.float32)
+            Mconv7_stage6_L2 = Mconv7_stage6_L2.cpu().numpy().astype(np.float32)
 
             # extract outputs, resize, and remove padding
             # heatmap = np.transpose(np.squeeze(net.blobs[output_blobs.keys()[1]].data), (1, 2, 0))  # output 1 is heatmaps
